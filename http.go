@@ -1,0 +1,50 @@
+package main
+
+import (
+	//        "encoding/json"
+	"fmt"
+	//        "log"
+	"net/http"
+	"sync"
+)
+
+type apiServer struct {
+	h       *http.Server
+	members map[string][]string
+	lock    sync.RWMutex
+}
+
+func (a *apiServer) getMembers(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		a.lock.Lock()
+		defer a.lock.Unlock()
+		fmt.Fprintf(w, "%#v", a.members)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintf(w, "sorry, can't do that")
+	}
+}
+
+func (a *apiServer) Update(channel string, members []string) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	a.members[channel] = members
+}
+
+func StartAPIServer() *apiServer {
+	httpServer := &http.Server{
+		Addr: listen,
+	}
+
+	apiServer := &apiServer{
+		h: httpServer,
+	}
+
+	http.HandleFunc("/jitsi", apiServer.getMembers)
+
+	go apiServer.h.ListenAndServe()
+
+	return apiServer
+}
