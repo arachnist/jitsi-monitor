@@ -38,8 +38,11 @@ func StartAPIServer() *apiServer {
 		Addr: listen,
 	}
 
+	members := make(map[string][]string)
+
 	apiServer := &apiServer{
-		h: httpServer,
+		h:       httpServer,
+		members: members,
 	}
 
 	http.HandleFunc("/jitsi", apiServer.getMembers)

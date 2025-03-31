@@ -162,7 +162,7 @@ func (j *JitsiClient) Run(done chan bool) {
 							log.Println("JitsiClient", j.server, j.room, "User joined:", j.users[v.X.Item.Jid])
 						}
 
-						nicks := make([]string, len(j.users))
+						var nicks []string
 						for _, val := range j.users {
 							nicks = append(nicks, val)
 						}
@@ -175,7 +175,7 @@ func (j *JitsiClient) Run(done chan bool) {
 						if knownNick, ok := j.users[v.X.Item.Jid]; ok {
 							delete(j.users, v.X.Item.Jid)
 							log.Println("JitsiClient", j.server, j.room, "User left:", knownNick)
-							nicks := make([]string, len(j.users))
+							var nicks []string
 							for _, val := range j.users {
 								nicks = append(nicks, val)
 							}
@@ -197,7 +197,7 @@ func JitsiRunWrapper(a *apiServer) []chan bool {
 	jitsiDone := make([]chan bool, len(jitsiChannels))
 
 	for i, ch := range jitsiChannels {
-		args := strings.Split(ch, ",")
+		args := strings.Split(ch, "/")
 		if len(args) != 2 {
 			log.Fatalln("Wrong jitsi channel mapping format", ch, args)
 		}

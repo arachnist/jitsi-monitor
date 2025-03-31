@@ -12,7 +12,7 @@ import (
 func init() {
 	flag.StringVar(&nickname, "nickname", "notbot", "bot nickname")
 	flag.StringVar(&listen, "listen", "127.0.0.1:6789", "listen address")
-	flag.Var(&jitsiChannels, "jitsi.channels", "jitsiServer,jitsiRoom mapping; may be specified multiple times")
+	flag.Var(&jitsiChannels, "jitsi.channels", "jitsiServer/jitsiRoom mapping; may be specified multiple times")
 }
 
 func main() {
