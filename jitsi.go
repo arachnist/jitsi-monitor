@@ -84,8 +84,21 @@ func (j *JitsiClient) KeepAlive(ws *websocket.Conn) {
 	}
 }
 
-func (j *JitsiClient) Run(done chan bool) {
+func (j *JitsiClient) ReadWS(ws *websocket.Conn, msgch chan []byte, errch chan error) {
 	var msg = make([]byte, 64*1024)
+
+	for {
+		_, err := ws.Read(msg)
+		if err != nil {
+			errch <- err
+			return
+		}
+		msgch <- msg
+	}
+}
+
+func (j *JitsiClient) Run(done chan struct{}) {
+	// var msg = make([]byte, 64*1024)
 
 	origin := "https://" + j.server
 	url := "wss://" + j.server + "/xmpp-websocket?room=" + j.room
@@ -107,6 +120,8 @@ func (j *JitsiClient) Run(done chan bool) {
 
 	for {
 		log.Println("JitsiClient", j.server, j.room, "Initializing")
+		msgch := make(chan []byte)
+		errch := make(chan error)
 
 		ws, err := websocket.Dial(url, protocol, origin)
 		if err != nil {
@@ -123,28 +138,23 @@ func (j *JitsiClient) Run(done chan bool) {
 
 		log.Println("JitsiClient", j.server, j.room, "Running")
 		go j.KeepAlive(ws)
+		go j.ReadWS(ws, msgch, errch)
 		for {
 			select {
 			case <-done:
 				log.Println("JitsiClient", j.server, j.room, "Shutting down")
 				return
-			default:
-				_, err := ws.Read(msg)
+			case err := <-errch:
+				log.Println("JitsiClient", j.server, j.room, "Error while reading from websocket", err)
+				goto reconnect
+			case msg := <-msgch:
 				v := JitsiPresence{}
-
-				if err != nil {
-					log.Println("JitsiClient", j.server, j.room, "Error while reading from websocket", err)
-					goto reconnect
-				}
-
 				err = xml.Unmarshal(msg, &v)
 				if err != nil {
-					// xml parsing errors will be normal here
-					log.Println("errorr unmarshaling xml message:", err)
+					// xml parsing errors will be normal here since we're only trying to decode presence messages
+					// log.Println("JitsiClient", j.server, j.room, "errorr unmarshaling xml message:", err)
 					continue
 				}
-
-				log.Printf("xml message: %#v", v)
 
 				if v.Nick.Text == j.nick {
 					continue
@@ -153,7 +163,7 @@ func (j *JitsiClient) Run(done chan bool) {
 				if v.Nick.Text != "" { // if presence event has Nick present, it *shouldn't* mean that user has left the chat
 					if v.X.Item.Jid != "" {
 						if knownNick, ok := j.users[v.X.Item.Jid]; ok {
-							if knownNick != v.Nick.Text { // user changed nickname, we don't care about that enough
+							if knownNick != v.Nick.Text {
 								log.Println("JitsiClient", j.server, j.room, "User changed nickname:", knownNick, v.Nick.Text)
 								j.users[v.X.Item.Jid] = v.Nick.Text
 							}
@@ -166,7 +176,7 @@ func (j *JitsiClient) Run(done chan bool) {
 						for _, val := range j.users {
 							nicks = append(nicks, val)
 						}
-						j.apiServer.Update(j.server+","+j.room, nicks)
+						j.apiServer.Update(j.server+"/"+j.room, nicks)
 						continue
 					}
 				}
@@ -179,7 +189,7 @@ func (j *JitsiClient) Run(done chan bool) {
 							for _, val := range j.users {
 								nicks = append(nicks, val)
 							}
-							j.apiServer.Update(j.server+","+j.room, nicks)
+							j.apiServer.Update(j.server+"/"+j.room, nicks)
 
 							continue
 						}
@@ -193,10 +203,12 @@ func (j *JitsiClient) Run(done chan bool) {
 	}
 }
 
-func JitsiRunWrapper(a *apiServer) []chan bool {
-	jitsiDone := make([]chan bool, len(jitsiChannels))
+func JitsiRunWrapper(a *apiServer) ([]chan struct{}) {
+	var jitsiDone []chan struct{}
 
-	for i, ch := range jitsiChannels {
+	for _, ch := range jitsiChannels {
+		doneCh := make(chan struct{})
+		jitsiDone = append(jitsiDone, doneCh)
 		args := strings.Split(ch, "/")
 		if len(args) != 2 {
 			log.Fatalln("Wrong jitsi channel mapping format", ch, args)
@@ -209,7 +221,7 @@ func JitsiRunWrapper(a *apiServer) []chan bool {
 			apiServer: a,
 		}
 
-		go j.Run(jitsiDone[i])
+		go j.Run(doneCh)
 	}
 
 	return jitsiDone

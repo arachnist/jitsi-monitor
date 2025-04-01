@@ -26,11 +26,10 @@ func main() {
 
 	log.Println("running...")
 	sig := waitForSignal()
-	log.Println("received signal", sig, ", shutting down")
+	log.Println("shutting down, received signal:", sig)
 
-	log.Println("disconnecting from jitsi servers")
 	for _, ch := range jitsiDone {
-		ch <- true
+		ch <- struct{}{}
 	}
 
 	log.Println("stopping the api server")
@@ -43,7 +42,7 @@ func main() {
 
 func waitForSignal() os.Signal {
 	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGHUP)
+	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
 	for {
 		sig := <-ch
 		signal.Stop(ch)
