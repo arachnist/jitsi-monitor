@@ -118,6 +118,7 @@ func (j *JitsiClient) Run(done chan struct{}) {
 		log.Println("JitsiClient", j.server, j.room, "Initializing")
 		msgch := make(chan []byte)
 		errch := make(chan error)
+		j.apiServer.Update(j.server+"/"+j.room, []string{""})
 
 		ws, err := websocket.Dial(url, protocol, origin)
 		if err != nil {
@@ -185,8 +186,11 @@ func (j *JitsiClient) Run(done chan struct{}) {
 							for _, val := range j.users {
 								nicks = append(nicks, val)
 							}
-							j.apiServer.Update(j.server+"/"+j.room, nicks)
-
+							if len(nicks) > 0 {
+								j.apiServer.Update(j.server+"/"+j.room, nicks)
+							} else {
+								j.apiServer.Update(j.server+"/"+j.room, []string{""})
+							}
 							continue
 						}
 					}
@@ -199,7 +203,7 @@ func (j *JitsiClient) Run(done chan struct{}) {
 	}
 }
 
-func JitsiRunWrapper(a *apiServer) ([]chan struct{}) {
+func JitsiRunWrapper(a *apiServer) []chan struct{} {
 	var jitsiDone []chan struct{}
 
 	for _, ch := range jitsiChannels {
