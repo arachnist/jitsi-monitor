@@ -1,9 +1,8 @@
 package main
 
 import (
-	//        "encoding/json"
+	"encoding/json"
 	"fmt"
-	//        "log"
 	"net/http"
 	"sync"
 )
@@ -19,7 +18,8 @@ func (a *apiServer) getMembers(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		a.lock.Lock()
 		defer a.lock.Unlock()
-		fmt.Fprintf(w, "%#v", a.members)
+		j, _ := json.Marshal(a.members)
+		w.Write(j)
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		fmt.Fprintf(w, "sorry, can't do that")

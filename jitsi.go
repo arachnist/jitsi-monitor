@@ -87,19 +87,15 @@ func (j *JitsiClient) KeepAlive(ws *websocket.Conn) {
 func (j *JitsiClient) ReadWS(ws *websocket.Conn, msgch chan []byte, errch chan error) {
 	var msg = make([]byte, 64*1024)
 
-	for {
-		_, err := ws.Read(msg)
-		if err != nil {
-			errch <- err
-			return
-		}
+	_, err := ws.Read(msg)
+	if err != nil {
+		errch <- err
+	} else {
 		msgch <- msg
 	}
 }
 
 func (j *JitsiClient) Run(done chan struct{}) {
-	// var msg = make([]byte, 64*1024)
-
 	origin := "https://" + j.server
 	url := "wss://" + j.server + "/xmpp-websocket?room=" + j.room
 	protocol := "xmpp"
@@ -138,8 +134,8 @@ func (j *JitsiClient) Run(done chan struct{}) {
 
 		log.Println("JitsiClient", j.server, j.room, "Running")
 		go j.KeepAlive(ws)
-		go j.ReadWS(ws, msgch, errch)
 		for {
+			go j.ReadWS(ws, msgch, errch)
 			select {
 			case <-done:
 				log.Println("JitsiClient", j.server, j.room, "Shutting down")
